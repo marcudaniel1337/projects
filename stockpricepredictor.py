@@ -698,3 +698,396 @@ def main():
     print("IMPORTANT DISCLAIMERS:")
     print("- This is for educational purposes only")
     print("- Past performance doesn't guarantee future results")
+    print("- Real markets are much more complex and unpredictable")
+    print("- Never risk money you can't afford to lose")
+    print("- Consider transaction costs, slippage, and market impact")
+    print("- Models can fail during market regime changes")
+    
+    # Optional: Create some visualizations if matplotlib works
+    try:
+        print("\nStep 6: Creating visualizations...")
+        
+        # Plot 1: Stock price with moving averages
+        plt.figure(figsize=(15, 10))
+        
+        # Plot recent price action
+        recent_data = stock_data.iloc[-200:]  # Last 200 days
+        
+        plt.subplot(2, 2, 1)
+        plt.plot(recent_data.index, recent_data['Close'], label='Close Price', linewidth=2)
+        plt.plot(recent_data.index, recent_data['Close'].rolling(20).mean(), 
+                label='20-day MA', alpha=0.7)
+        plt.plot(recent_data.index, recent_data['Close'].rolling(50).mean(), 
+                label='50-day MA', alpha=0.7)
+        plt.title('Stock Price with Moving Averages')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # Plot 2: Volume
+        plt.subplot(2, 2, 2)
+        plt.bar(recent_data.index, recent_data['Volume'], alpha=0.6)
+        plt.title('Trading Volume')
+        plt.grid(True, alpha=0.3)
+        
+        # Plot 3: RSI
+        recent_featured = calculate_technical_indicators(recent_data)
+        plt.subplot(2, 2, 3)
+        plt.plot(recent_featured.index, recent_featured['RSI'])
+        plt.axhline(y=70, color='r', linestyle='--', alpha=0.7, label='Overbought')
+        plt.axhline(y=30, color='g', linestyle='--', alpha=0.7, label='Oversold')
+        plt.title('RSI (Relative Strength Index)')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # Plot 4: MACD
+        plt.subplot(2, 2, 4)
+        plt.plot(recent_featured.index, recent_featured['MACD'], label='MACD')
+        plt.plot(recent_featured.index, recent_featured['MACD_Signal'], label='Signal')
+        plt.bar(recent_featured.index, recent_featured['MACD_Histogram'], 
+                alpha=0.3, label='Histogram')
+        plt.title('MACD')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        print("Visualizations created successfully!")
+        
+    except Exception as e:
+        print(f"Visualization failed: {e}")
+        print("(This is normal if matplotlib isn't properly configured)")
+
+def advanced_features_demo():
+    """
+    Demonstrate some advanced features and techniques.
+    
+    This shows more sophisticated approaches that professional quant teams use:
+    - Cross-validation for time series
+    - Hyperparameter optimization
+    - Risk management metrics
+    - Multi-timeframe analysis
+    """
+    print("\n" + "=" * 60)
+    print("ADVANCED FEATURES DEMONSTRATION")
+    print("=" * 60)
+    
+    # Generate more complex data for advanced demo
+    stock_data = generate_sample_data("TECH_STOCK", days=1200)
+    
+    print("Advanced Feature 1: Time Series Cross-Validation")
+    print("-" * 50)
+    
+    # Time series cross-validation - this is crucial for avoiding lookahead bias
+    # We can't use regular cross-validation because it would use future data to predict past
+    tscv = TimeSeriesSplit(n_splits=5)
+    
+    # Prepare basic features
+    featured_data = prepare_features(stock_data, target_days=1)
+    feature_cols = [col for col in featured_data.columns 
+                   if col not in ['Target', 'Open', 'High', 'Low', 'Close', 'Volume']]
+    
+    clean_data = featured_data[feature_cols + ['Target']].dropna()
+    X, y = clean_data[feature_cols], clean_data['Target']
+    
+    # Cross-validation with Random Forest
+    cv_scores = []
+    for fold, (train_idx, val_idx) in enumerate(tscv.split(X)):
+        X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+        y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+        
+        # Train model
+        rf = RandomForestRegressor(n_estimators=50, random_state=42)
+        rf.fit(X_train, y_train)
+        
+        # Predict and score
+        y_pred = rf.predict(X_val)
+        score = r2_score(y_val, y_pred)
+        cv_scores.append(score)
+        
+        print(f"Fold {fold + 1}: R² = {score:.4f}")
+    
+    print(f"Average CV Score: {np.mean(cv_scores):.4f} ± {np.std(cv_scores):.4f}")
+    print()
+    
+    print("Advanced Feature 2: Risk-Adjusted Performance Metrics")
+    print("-" * 50)
+    
+    # Calculate more sophisticated performance metrics
+    returns = stock_data['Close'].pct_change().dropna()
+    
+    # Sharpe Ratio (return per unit of risk)
+    sharpe_ratio = returns.mean() / returns.std() * np.sqrt(252)  # Annualized
+    
+    # Maximum Drawdown (worst peak-to-trough decline)
+    cumulative_returns = (1 + returns).cumprod()
+    rolling_max = cumulative_returns.expanding().max()
+    drawdown = (cumulative_returns - rolling_max) / rolling_max
+    max_drawdown = drawdown.min()
+    
+    # Volatility (annualized)
+    volatility = returns.std() * np.sqrt(252)
+    
+    # Value at Risk (VaR) - potential loss at 95% confidence
+    var_95 = np.percentile(returns, 5)
+    
+    print(f"Annualized Return: {returns.mean() * 252 * 100:.2f}%")
+    print(f"Annualized Volatility: {volatility * 100:.2f}%")
+    print(f"Sharpe Ratio: {sharpe_ratio:.3f}")
+    print(f"Maximum Drawdown: {max_drawdown * 100:.2f}%")
+    print(f"VaR (95%): {var_95 * 100:.2f}% daily loss")
+    print()
+    
+    print("Advanced Feature 3: Multi-Timeframe Analysis")
+    print("-" * 50)
+    
+    # Analyze patterns at different timeframes
+    # This is what professional traders do - look at multiple time horizons
+    
+    timeframes = {
+        'Daily': stock_data.resample('D').agg({
+            'Open': 'first', 'High': 'max', 'Low': 'min', 
+            'Close': 'last', 'Volume': 'sum'
+        }),
+        'Weekly': stock_data.resample('W').agg({
+            'Open': 'first', 'High': 'max', 'Low': 'min', 
+            'Close': 'last', 'Volume': 'sum'
+        }),
+        'Monthly': stock_data.resample('M').agg({
+            'Open': 'first', 'High': 'max', 'Low': 'min', 
+            'Close': 'last', 'Volume': 'sum'
+        })
+    }
+    
+    for timeframe_name, timeframe_data in timeframes.items():
+        if len(timeframe_data) > 20:  # Enough data for analysis
+            returns_tf = timeframe_data['Close'].pct_change().dropna()
+            
+            # Calculate statistics for this timeframe
+            mean_return = returns_tf.mean() * 100
+            volatility_tf = returns_tf.std() * 100
+            sharpe_tf = returns_tf.mean() / returns_tf.std() if returns_tf.std() > 0 else 0
+            
+            # Win rate (percentage of positive returns)
+            win_rate = (returns_tf > 0).mean() * 100
+            
+            print(f"{timeframe_name:>8}: Avg Return={mean_return:+.3f}%, "
+                  f"Volatility={volatility_tf:.3f}%, "
+                  f"Sharpe={sharpe_tf:.3f}, "
+                  f"Win Rate={win_rate:.1f}%")
+    
+    print()
+    
+    print("Advanced Feature 4: Regime Detection")
+    print("-" * 50)
+    
+    # Market regime detection - identifying bull/bear markets
+    # This is important because models might work differently in different market conditions
+    
+    # Calculate rolling statistics
+    window = 60  # 60-day window
+    rolling_returns = returns.rolling(window).mean()
+    rolling_vol = returns.rolling(window).std()
+    
+    # Define regimes based on return and volatility
+    # High return + Low vol = Bull market
+    # Low return + High vol = Bear market
+    # etc.
+    
+    return_threshold = rolling_returns.median()
+    vol_threshold = rolling_vol.median()
+    
+    regimes = []
+    for i in range(len(rolling_returns)):
+        if pd.isna(rolling_returns.iloc[i]) or pd.isna(rolling_vol.iloc[i]):
+            regimes.append('Unknown')
+        elif rolling_returns.iloc[i] > return_threshold and rolling_vol.iloc[i] < vol_threshold:
+            regimes.append('Bull_Low_Vol')
+        elif rolling_returns.iloc[i] > return_threshold and rolling_vol.iloc[i] >= vol_threshold:
+            regimes.append('Bull_High_Vol')
+        elif rolling_returns.iloc[i] <= return_threshold and rolling_vol.iloc[i] < vol_threshold:
+            regimes.append('Bear_Low_Vol')
+        else:
+            regimes.append('Bear_High_Vol')
+    
+    # Analyze regime distribution
+    regime_counts = pd.Series(regimes).value_counts()
+    print("Market Regime Distribution:")
+    for regime, count in regime_counts.items():
+        percentage = count / len(regimes) * 100
+        print(f"  {regime:>15}: {count:>3} days ({percentage:.1f}%)")
+    
+    print()
+    
+    print("Advanced Feature 5: Feature Engineering Ideas")
+    print("-" * 50)
+    
+    # Show some advanced feature engineering techniques
+    print("Here are some advanced features that professional quants use:")
+    print()
+    
+    feature_ideas = [
+        "Price Momentum Factors:",
+        "  - Cross-sectional momentum (vs market/sector)",
+        "  - Risk-adjusted momentum (momentum / volatility)",
+        "  - Momentum persistence (autocorrelation)",
+        "",
+        "Volatility Features:",
+        "  - GARCH-based volatility forecasts",
+        "  - Realized volatility from intraday data",
+        "  - Volatility term structure",
+        "",
+        "Market Microstructure:",
+        "  - Bid-ask spreads and market impact",
+        "  - Order flow imbalance",
+        "  - High-frequency price patterns",
+        "",
+        "Fundamental Features:",
+        "  - Earnings surprises and revisions",
+        "  - Financial ratios and growth rates",
+        "  - Sentiment from news and social media",
+        "",
+        "Cross-asset Features:",
+        "  - Correlations with other assets",
+        "  - Sector rotation patterns",
+        "  - Macro-economic indicators",
+        "",
+        "Alternative Data:",
+        "  - Satellite imagery (for commodities)",
+        "  - Web scraping and search trends",
+        "  - Patent filings and insider trading"
+    ]
+    
+    for idea in feature_ideas:
+        print(idea)
+    
+    print()
+    print("=" * 60)
+    print("ADVANCED DEMO COMPLETED")
+    print("=" * 60)
+
+class RiskManager:
+    """
+    Risk management system for trading strategies.
+    
+    This is absolutely crucial in real trading - you need to manage risk
+    or you'll eventually blow up your account, even with a profitable strategy.
+    """
+    
+    def __init__(self, max_position_size=0.1, max_daily_loss=0.02, max_drawdown=0.1):
+        """
+        Initialize risk manager.
+        
+        max_position_size: Maximum % of portfolio in single position
+        max_daily_loss: Maximum daily loss as % of portfolio
+        max_drawdown: Maximum drawdown before stopping trading
+        """
+        self.max_position_size = max_position_size
+        self.max_daily_loss = max_daily_loss
+        self.max_drawdown = max_drawdown
+        self.daily_pnl = 0
+        self.peak_portfolio_value = 0
+        self.current_drawdown = 0
+        
+        print(f"Risk Manager initialized:")
+        print(f"  Max position size: {max_position_size*100:.1f}%")
+        print(f"  Max daily loss: {max_daily_loss*100:.1f}%")
+        print(f"  Max drawdown: {max_drawdown*100:.1f}%")
+    
+    def check_position_size(self, proposed_size, portfolio_value):
+        """Check if proposed position size is within limits"""
+        position_pct = abs(proposed_size) / portfolio_value
+        
+        if position_pct > self.max_position_size:
+            # Scale down to maximum allowed
+            allowed_size = self.max_position_size * portfolio_value
+            if proposed_size < 0:
+                allowed_size = -allowed_size
+            
+            print(f"Position size reduced from {position_pct*100:.1f}% to {self.max_position_size*100:.1f}%")
+            return allowed_size
+        
+        return proposed_size
+    
+    def check_daily_loss(self, portfolio_value, start_of_day_value):
+        """Check if daily loss limit has been exceeded"""
+        daily_return = (portfolio_value - start_of_day_value) / start_of_day_value
+        
+        if daily_return < -self.max_daily_loss:
+            print(f"RISK ALERT: Daily loss of {daily_return*100:.2f}% exceeds limit of {self.max_daily_loss*100:.1f}%")
+            return False  # Stop trading for the day
+        
+        return True  # OK to continue trading
+    
+    def update_drawdown(self, portfolio_value):
+        """Update drawdown calculation"""
+        if portfolio_value > self.peak_portfolio_value:
+            self.peak_portfolio_value = portfolio_value
+            self.current_drawdown = 0
+        else:
+            self.current_drawdown = (self.peak_portfolio_value - portfolio_value) / self.peak_portfolio_value
+        
+        if self.current_drawdown > self.max_drawdown:
+            print(f"RISK ALERT: Drawdown of {self.current_drawdown*100:.2f}% exceeds limit of {self.max_drawdown*100:.1f}%")
+            return False  # Stop trading entirely
+        
+        return True  # OK to continue
+    
+    def calculate_position_size(self, signal_strength, volatility, portfolio_value):
+        """
+        Calculate optimal position size using Kelly Criterion or similar.
+        
+        This is a more sophisticated approach than fixed position sizing.
+        """
+        # Simple volatility-adjusted sizing
+        # In practice, you'd use more sophisticated methods like Kelly Criterion
+        
+        base_size = self.max_position_size * portfolio_value
+        
+        # Adjust for signal strength (0 to 1)
+        size_multiplier = min(abs(signal_strength), 1.0)
+        
+        # Adjust for volatility (higher vol = smaller position)
+        vol_adjustment = min(1.0, 0.02 / max(volatility, 0.01))  # Target 2% volatility
+        
+        optimal_size = base_size * size_multiplier * vol_adjustment
+        
+        return optimal_size if signal_strength > 0 else -optimal_size
+
+# Run the main demonstration
+if __name__ == "__main__":
+    # Run basic demo
+    main()
+    
+    # Run advanced features demo
+    advanced_features_demo()
+    
+    print("\n" + "=" * 60)
+    print("FINAL THOUGHTS AND NEXT STEPS")
+    print("=" * 60)
+    print()
+    print("What you've learned:")
+    print("✓ How to build a multi-model ensemble for stock prediction")
+    print("✓ Technical indicator calculation and feature engineering")
+    print("✓ Proper time series validation techniques")
+    print("✓ Backtesting and performance evaluation")
+    print("✓ Risk management principles")
+    print("✓ Advanced concepts used by professional quants")
+    print()
+    print("Next steps to make this production-ready:")
+    print("1. Replace mock LSTM with real TensorFlow/PyTorch implementation")
+    print("2. Add real data feeds (Yahoo Finance, Alpha Vantage, etc.)")
+    print("3. Implement more sophisticated feature engineering")
+    print("4. Add transaction costs and market impact modeling")
+    print("5. Build a proper database for storing predictions and results")
+    print("6. Add real-time data processing and alerting")
+    print("7. Implement more advanced ML models (Transformers, etc.)")
+    print("8. Add regime detection and model switching")
+    print("9. Build a proper web interface or API")
+    print("10. Add comprehensive logging and monitoring")
+    print()
+    print("Remember: The market is incredibly complex and adaptive.")
+    print("What works today might not work tomorrow!")
+    print("Always validate your models on out-of-sample data.")
+    print()
+    print("Good luck with your quantitative finance journey! 🚀")
